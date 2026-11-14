@@ -7,7 +7,7 @@ metadata:
 spec:
   description: Стенд МКР - платформа та застосунок shop
   sourceRepos:
-    - https://github.com/CHANGE_ME/k8s-gitops-stand.git
+    - https://github.com/rossertylave/k8s-gitops-stand.git
     - https://prometheus-community.github.io/helm-charts
   destinations:
     - server: https://kubernetes.default.svc

@@ -8,7 +8,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/CHANGE_ME/k8s-gitops-stand.git
+    repoURL: https://github.com/rossertylave/k8s-gitops-stand.git
     targetRevision: main
     path: gitops/root
   destination:
