@@ -1,0 +1,115 @@
+# CI-конвеєр: тести -> збирання образу -> сканування вразливостей -> публікація в GHCR.
+# Розгортання виконує не конвеєр, а Argo CD (pull-модель GitOps): конвеєр лише
+# змінює тег образу в Git (job bump, запускається вручну через workflow_dispatch).
+name: ci
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "services/**"
+      - ".github/workflows/ci.yaml"
+  pull_request:
+    paths:
+      - "services/**"
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: "Оновити тег образів в overlay dev (GitOps)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [catalog, orders, gateway]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: services/${{ matrix.service }}/requirements.txt
+      - name: Install dependencies
+        working-directory: services/${{ matrix.service }}
+        run: pip install -r requirements.txt pytest
+      - name: Unit tests
+        working-directory: services/${{ matrix.service }}
+        run: python -m pytest -q
+
+  manifests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Render overlays
+        run: |
+          for env in dev prod manual; do
+            kubectl kustomize "gitops/apps/shop/overlays/${env}" > "/tmp/${env}.yaml"
+          done
+
+  build:
+    needs: [test, manifests]
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        service: [catalog, orders, gateway]
+    env:
+      IMAGE: ghcr.io/${{ github.repository_owner }}/shop-${{ matrix.service }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: services/${{ matrix.service }}
+          load: true
+          tags: ${{ env.IMAGE }}:${{ github.sha }}
+          build-args: |
+            APP_VERSION=${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+      - name: Scan image (fail on CRITICAL)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.IMAGE }}:${{ github.sha }}
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+      - name: Push image
+        run: docker push "${IMAGE}:${GITHUB_SHA}"
+
+  bump:
+    needs: build
+    if: github.event_name == 'workflow_dispatch' && inputs.deploy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Update image references in overlay dev
+        env:
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          f=gitops/apps/shop/overlays/dev/kustomization.yaml
+          for svc in catalog orders gateway; do
+            sed -i "s|newName: .*/shop[-/]${svc}\$|newName: ghcr.io/${OWNER}/shop-${svc}|" "$f"
+            sed -i "s|newTag: .* # ${svc}-tag|newTag: ${GITHUB_SHA} # ${svc}-tag|" "$f"
+          done
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "deploy(dev): shop ${GITHUB_SHA} [skip ci]"
+          git push

@@ -1,0 +1,59 @@
+# Платформний компонент: Prometheus Operator + Prometheus + Grafana (Helm-чарт).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: monitoring
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: stand
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-prometheus-stack
+    targetRevision: 93.3.0
+    helm:
+      releaseName: monitoring
+      valuesObject:
+        alertmanager:
+          enabled: false
+        # У k3s компоненти control plane працюють в одному процесі,
+        # тому окремі цілі збору метрик для них вимкнено.
+        kubeEtcd:
+          enabled: false
+        kubeScheduler:
+          enabled: false
+        kubeControllerManager:
+          enabled: false
+        kubeProxy:
+          enabled: false
+        grafana:
+          adminPassword: stand-admin   # лише для локального стенда
+        prometheus:
+          prometheusSpec:
+            retention: 24h
+            scrapeInterval: 15s
+            # Обирати ServiceMonitor/PodMonitor/правила з усіх просторів імен
+            serviceMonitorSelectorNilUsesHelmValues: false
+            podMonitorSelectorNilUsesHelmValues: false
+            ruleSelectorNilUsesHelmValues: false
+            resources:
+              requests:
+                cpu: 100m
+                memory: 400Mi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 15s
+        factor: 2
+        maxDuration: 3m

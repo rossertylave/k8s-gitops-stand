@@ -1,0 +1,24 @@
+# Декларативний опис кластера стенда (k3d = k3s у Docker-контейнерах).
+# 1 вузол control plane + 2 робочі вузли, вбудований балансувальник.
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+metadata:
+  name: stand
+servers: 1
+agents: 2
+ports:
+  - port: 8080:80          # HTTP-вхід (Traefik Ingress) -> localhost:8080
+    nodeFilters:
+      - loadbalancer
+registries:
+  use:
+    - k3d-stand-registry.localhost:5001
+options:
+  k3d:
+    wait: true
+    timeout: "180s"
+  k3s:
+    nodeLabels:
+      - label: stand/role=worker
+        nodeFilters:
+          - agent:*

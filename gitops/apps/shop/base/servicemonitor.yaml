@@ -1,0 +1,15 @@
+# Збирання метрик усіх сервісів shop системою Prometheus (CRD Prometheus Operator).
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: shop
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/part-of: shop
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s

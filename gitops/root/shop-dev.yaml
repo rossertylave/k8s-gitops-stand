@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: shop-dev
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: stand
+  source:
+    repoURL: https://github.com/CHANGE_ME/k8s-gitops-stand.git
+    targetRevision: main
+    path: gitops/apps/shop/overlays/dev
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: shop-dev
+  syncPolicy:
+    automated:
+      prune: true      # видаляти ресурси, яких більше немає в Git
+      selfHeal: true   # усувати ручні зміни (дрейф конфігурації)
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 10
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 2m

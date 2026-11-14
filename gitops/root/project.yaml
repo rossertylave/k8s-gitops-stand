@@ -1,0 +1,25 @@
+# AppProject обмежує, звідки і куди Argo CD може розгортати застосунки стенда.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: stand
+  namespace: argocd
+spec:
+  description: Стенд МКР - платформа та застосунок shop
+  sourceRepos:
+    - https://github.com/CHANGE_ME/k8s-gitops-stand.git
+    - https://prometheus-community.github.io/helm-charts
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: shop-dev
+    - server: https://kubernetes.default.svc
+      namespace: shop-prod
+    - server: https://kubernetes.default.svc
+      namespace: monitoring
+    - server: https://kubernetes.default.svc
+      namespace: kube-system
+    - server: https://kubernetes.default.svc
+      namespace: argocd
+  clusterResourceWhitelist:
+    - group: "*"
+      kind: "*"

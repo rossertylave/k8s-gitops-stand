@@ -1,0 +1,31 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: shop-manual
+resources:
+  - ../../base
+images:
+  - name: shop/catalog
+    newName: k3d-stand-registry.localhost:5001/shop/catalog
+    newTag: v1 # catalog-tag
+  - name: shop/orders
+    newName: k3d-stand-registry.localhost:5001/shop/orders
+    newTag: v1 # orders-tag
+  - name: shop/gateway
+    newName: k3d-stand-registry.localhost:5001/shop/gateway
+    newTag: v1 # gateway-tag
+patches:
+  - target:
+      kind: Ingress
+      name: shop
+    patch: |-
+      - op: replace
+        path: /spec/rules/0/host
+        value: shop-manual.localhost
+  # Контрольне середовище без GitOps і без автомасштабування (min = max = 2)
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: catalog
+    patch: |-
+      - op: replace
+        path: /spec/maxReplicas
+        value: 2

@@ -1,0 +1,20 @@
+# Кореневий застосунок (патерн app-of-apps): єдиний ресурс, який застосовується
+# вручну. Усе інше Argo CD створює сам із каталогу gitops/root репозиторію.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/CHANGE_ME/k8s-gitops-stand.git
+    targetRevision: main
+    path: gitops/root
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
