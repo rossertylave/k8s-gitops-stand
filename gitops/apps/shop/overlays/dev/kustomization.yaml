@@ -6,7 +6,7 @@ resources:
 images:
   - name: shop/catalog
     newName: k3d-stand-registry.localhost:5001/shop/catalog
-    newTag: bad # catalog-tag
+    newTag: v1 # catalog-tag
   - name: shop/orders
     newName: k3d-stand-registry.localhost:5001/shop/orders
     newTag: v1 # orders-tag
